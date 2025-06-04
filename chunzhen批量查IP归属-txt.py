@@ -8,28 +8,96 @@ pip install分别安装qqwry和IPy库
 将要查询的ip放到ip.txt并和qqwry.dat、.py文件在同一个目录即可运行
 '''
 
+import os
+import sys
 from qqwry import QQwry
 from IPy import IP
 
-
 def batch_query_and_print():
+    # 获取脚本所在目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 检查qqwry_lastest.dat文件是否存在
+    db_path = os.path.join(script_dir, "qqwry_lastest.dat")
+    if not os.path.exists(db_path):
+        print("错误: 脚本所在目录下未找到qqwry_lastest.dat文件")
+        print("请从以下地址下载: https://raw.githubusercontent.com/out0fmemory/qqwry.dat/master/qqwry_lastest.dat")
+        sys.exit(1)
+    
+    # 查找脚本所在目录下的所有txt文件
+    txt_files = [f for f in os.listdir(script_dir) if f.endswith('.txt') and f != "qqwry_lastest.dat"]
+    
+    if not txt_files:
+        print("错误: 脚本所在目录下未找到txt文件")
+        sys.exit(1)
+    
+    # 显示txt文件列表供用户选择
+    print("找到以下txt文件:")
+    for i, filename in enumerate(txt_files, 1):
+        print(f"{i}. {filename}")
+    
+    # 获取用户选择
+    while True:
+        try:
+            choice = int(input("请输入要查询的txt文件编号: "))
+            if 1 <= choice <= len(txt_files):
+                selected_file = txt_files[choice - 1]
+                break
+            else:
+                print("输入无效，请输入有效的编号")
+        except ValueError:
+            print("输入无效，请输入数字")
+    
+    # 读取选中的txt文件中的IP地址
+    input_file_path = os.path.join(script_dir, selected_file)
+    try:
+        with open(input_file_path, 'r') as f:
+            ip_list = f.read().splitlines()
+    except Exception as e:
+        print(f"读取文件失败: {e}")
+        sys.exit(1)
+    
+    # 验证IP地址格式
+    invalid_ips = []
+    for ip in ip_list:
+        try:
+            IP(ip)
+        except Exception:
+            invalid_ips.append(ip)
+    
+    if invalid_ips:
+        print("发现不符合规范的IP地址:")
+        for ip in invalid_ips:
+            print(f"- {ip}")
+        print("请检查并修正后重新运行")
+        sys.exit(1)
+    
+    # 加载IP数据库并查询
     q = QQwry()
-    q.load_file('/Users/songzi/Desktop/ip/qqwry_lastest.dat')
-    with open('/Users/songzi/Desktop/ip/1.txt') as f:
-        ip_list = f.read().splitlines()
-        for read_content in ip_list:
-            try:
-                IP(read_content)
-            except Exception:
-                print("有不符合规范的IP地址，请检查后重新运行")
-                exit(0)
-    address_list = [q.lookup(ip) for ip in ip_list]
-    for i, j in zip(ip_list, address_list):
-        query_results = f"{i} {j[0]} {j[1]}"
-        print(query_results)
-        with open("/Users/songzi/Desktop/ip/2.txt", 'a', encoding='utf-8') as f:
-            f.writelines(query_results+"\n")
-
+    q.load_file(db_path)
+    
+    # 准备输出文件路径
+    output_filename = f"{os.path.splitext(selected_file)[0]}_result.txt"
+    output_file_path = os.path.join(script_dir, output_filename)
+    
+    # 执行查询并写入结果
+    try:
+        with open(output_file_path, 'w', encoding='utf-8') as f_out:
+            for ip in ip_list:
+                result = q.lookup(ip)
+                if result:
+                    country, area = result
+                    query_results = f"{ip} {country} {area}"
+                else:
+                    query_results = f"{ip} 未找到匹配信息"
+                
+                print(query_results)
+                f_out.write(query_results + "\n")
+        
+        print(f"\n查询完成，结果已保存到: {output_file_path}")
+    except Exception as e:
+        print(f"写入结果失败: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    batch_query_and_print()
+    batch_query_and_print()    
